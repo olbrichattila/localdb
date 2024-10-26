@@ -194,6 +194,7 @@ func dataTest() {
 	fmt.Println("Elapsed time:", elapsed)
 }
 
+// This function is just to benchmark against SQLIte
 // func indexTest() {
 // 	t, err := btree.New("testindex", 12)
 // 	if err != nil {
