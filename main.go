@@ -1,4 +1,4 @@
-// Package main is the main entry point
+// Package main is the main entry point, it is only for playing the database locally, will be removed when package is done
 package main
 
 import (
