@@ -1,0 +1,28 @@
+package db
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/suite"
+)
+
+type exampleTestSuite struct {
+	suite.Suite
+}
+
+func TestExampleRunner(t *testing.T) {
+	suite.Run(t, new(exampleTestSuite))
+}
+
+func (t *exampleTestSuite) SetupTest() {
+	// TODO
+}
+
+func (t *exampleTestSuite) TearDownTest() {
+	// TODO
+}
+
+func (t *exampleTestSuite) TestMissingArgsReturnsError() {
+	// TODO
+	t.True(true)
+}
