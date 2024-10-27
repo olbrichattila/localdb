@@ -5,15 +5,16 @@ import (
 	"fmt"
 	filemanager "godb/pkg/file"
 	"io"
+	"sync"
 )
 
 type inserter interface {
-	Insert(*currentTable, map[string]interface{}) (*currentTable, error)
+	Insert(*CurrentTable, map[string]interface{}) (*CurrentTable, error)
 }
 
 type ins struct {
 	filer        filemanager.Filer
-	currentTable *currentTable
+	CurrentTable *CurrentTable
 }
 
 func newInserter() inserter {
@@ -22,8 +23,8 @@ func newInserter() inserter {
 	}
 }
 
-func (i *ins) Insert(c *currentTable, data map[string]interface{}) (*currentTable, error) {
-	i.currentTable = c
+func (i *ins) Insert(c *CurrentTable, data map[string]interface{}) (*CurrentTable, error) {
+	i.CurrentTable = c
 	record, err := i.dataAsBytes(data)
 	if err != nil {
 		return nil, err
@@ -40,12 +41,12 @@ func (i *ins) Insert(c *currentTable, data map[string]interface{}) (*currentTabl
 	}
 
 	i.addToIndexIfIndexed(data, recordNo)
-	return i.currentTable, nil
+	return i.CurrentTable, nil
 }
 
 func (i *ins) addToIndexIfIndexed(data map[string]interface{}, recordPtr int64) error {
-	// var wg sync.WaitGroup
-	for _, field := range i.currentTable.fieldDef.Fields {
+	var wg sync.WaitGroup
+	for _, field := range i.CurrentTable.fieldDef.Fields {
 		if field.Indexes != nil {
 			for _, index := range field.Indexes {
 				var value interface{}
@@ -60,33 +61,33 @@ func (i *ins) addToIndexIfIndexed(data map[string]interface{}, recordPtr int64) 
 				}
 				index := *index.index
 
-				err = index.Insert(buf, recordPtr)
-				if err != nil {
-					return err
-				}
+				// err = index.Insert(buf, recordPtr)
+				// if err != nil {
+				// 	return err
+				// }
 
-				// wg.Add(1)
-				// go func(b []byte, r int64) {
-				// 	defer wg.Done()
-				// 	index.Insert(b, r)
-				// }(buf, recordPtr)
+				wg.Add(1)
+				go func(b []byte, r int64) {
+					defer wg.Done()
+					index.Insert(b, r)
+				}(buf, recordPtr)
 			}
 
 		}
 
 	}
 
-	// wg.Wait()
+	wg.Wait()
 	return nil
 }
 
 func (i *ins) addToDatFile(data []byte) (int64, error) {
-	offset, err := i.currentTable.fileHandlers.dat.Seek(0, io.SeekEnd)
+	offset, err := i.CurrentTable.fileHandlers.dat.Seek(0, io.SeekEnd)
 	if err != nil {
 		return 0, err
 	}
 
-	_, err = i.currentTable.fileHandlers.dat.Write(data)
+	_, err = i.CurrentTable.fileHandlers.dat.Write(data)
 	if err != nil {
 		return 0, err
 	}
@@ -96,7 +97,7 @@ func (i *ins) addToDatFile(data []byte) (int64, error) {
 
 func (i *ins) addToRecordPointerFile(value int64) (int64, error) {
 	// Make sure we are at the end of the file
-	offset, err := i.currentTable.fileHandlers.rpt.Seek(0, io.SeekEnd)
+	offset, err := i.CurrentTable.fileHandlers.rpt.Seek(0, io.SeekEnd)
 	if err != nil {
 		return 0, err
 	}
@@ -105,7 +106,7 @@ func (i *ins) addToRecordPointerFile(value int64) (int64, error) {
 	binary.LittleEndian.PutUint64(buf, uint64(value))
 	buf = append(buf, 0) // add not deleted + 1 deleted flag
 
-	_, err = i.currentTable.fileHandlers.rpt.Write(buf)
+	_, err = i.CurrentTable.fileHandlers.rpt.Write(buf)
 	if err != nil {
 		return 0, err
 	}
@@ -116,7 +117,7 @@ func (i *ins) addToRecordPointerFile(value int64) (int64, error) {
 func (i *ins) dataAsBytes(data map[string]interface{}) ([]byte, error) {
 	result := make([]byte, 0)
 
-	for _, field := range i.currentTable.fieldDef.Fields {
+	for _, field := range i.CurrentTable.fieldDef.Fields {
 		var value interface{}
 		var err error
 		if val, ok := data[field.Name]; ok {
@@ -175,7 +176,20 @@ func (i *ins) convertFkInt(field Field, value interface{}) ([]byte, error) {
 		binary.LittleEndian.PutUint64(buf, uint64(val))
 
 		return buf, nil
+	}
 
+	if val, ok := value.(int); ok {
+		buf := make([]byte, filemanager.Int64Length) // int64 is 8 bytes
+		binary.LittleEndian.PutUint64(buf, uint64(val))
+
+		return buf, nil
+	}
+
+	if val, ok := value.(float64); ok {
+		buf := make([]byte, filemanager.Int64Length) // int64 is 8 bytes
+		binary.LittleEndian.PutUint64(buf, uint64(val))
+
+		return buf, nil
 	}
 
 	return nil, fmt.Errorf("field %s requires int64 value in data map", field.Name)

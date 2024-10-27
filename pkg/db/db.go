@@ -17,21 +17,20 @@ func New() Manager {
 // Manager is the abstracted manger interface
 type Manager interface {
 	Create(tableName string, tableStruct *FieldDef) error
-	Open(tableName string) (*currentTable, error)
-	Close(c *currentTable) error
-	Insert(*currentTable, map[string]interface{}) (*currentTable, error)
-	RecCount(c *currentTable) (int64, error)
-	First(c *currentTable) error
-	Last(c *currentTable) error
-	Fetch(c *currentTable, recNo int64) (map[string]interface{}, bool, error)
-	Next(c *currentTable) (map[string]interface{}, bool, error)
-	Prev(c *currentTable) (map[string]interface{}, bool, error)
-	Locate(c *currentTable, fieldName string, value interface{}) (map[string]interface{}, error)
-	Delete(c *currentTable, recNo int64) error
-	Use(c *currentTable, indexName string) error
-	// Add insert
+	Open(tableName string) (*CurrentTable, error)
+	Close(c *CurrentTable) error
+	Insert(*CurrentTable, map[string]interface{}) (*CurrentTable, error)
+	RecCount(c *CurrentTable) (int64, error)
+	First(c *CurrentTable) (map[string]interface{}, bool, error)
+	Last(c *CurrentTable) (map[string]interface{}, bool, error)
+	Fetch(c *CurrentTable, recNo int64) (map[string]interface{}, bool, bool, error)
+	Next(c *CurrentTable) (map[string]interface{}, bool, error)
+	Prev(c *CurrentTable) (map[string]interface{}, bool, error)
+	Locate(c *CurrentTable, fieldName string, value interface{}) (map[string]interface{}, error)
+	Seek(c *CurrentTable, value interface{}) error
+	Delete(c *CurrentTable, recNo int64) error
+	Use(c *CurrentTable, indexName string) error
 	// Add recNo
-	// Add seek (index later)
 	// Add update
 }
 
@@ -43,60 +42,84 @@ type db struct {
 	deleter      deleter
 }
 
+// Create creates a database with it's structure
 func (d *db) Create(tableName string, tableStruct *FieldDef) error {
 	return d.tableCreator.Create(tableName, tableStruct)
 }
 
-func (*db) Open(tableName string) (*currentTable, error) {
+// Open is opening a new table wit it's indexes
+func (*db) Open(tableName string) (*CurrentTable, error) {
 	return newTableOpener(tableName)
 }
 
-func (*db) Close(c *currentTable) error {
+// Close closes the table and it's indexes
+func (*db) Close(c *CurrentTable) error {
 	return c.Close()
 }
 
-func (d *db) Insert(c *currentTable, data map[string]interface{}) (*currentTable, error) {
+// Insert adds a new row to the table, update indexes
+func (d *db) Insert(c *CurrentTable, data map[string]interface{}) (*CurrentTable, error) {
 	return d.inserter.Insert(c, data)
 }
 
-func (d *db) RecCount(c *currentTable) (int64, error) {
+// RecCount returns with the number of records in the table
+func (d *db) RecCount(c *CurrentTable) (int64, error) {
 	return d.stater.RecCount(c)
 }
 
-func (d *db) First(c *currentTable) error {
+// First moves the table or index if in use to the first position, returns first value
+func (d *db) First(c *CurrentTable) (map[string]interface{}, bool, error) {
 	return d.fetcher.First(c)
 }
 
-func (d *db) Last(c *currentTable) error {
+// Last moves the table or index if in use to the last position, returns last value
+func (d *db) Last(c *CurrentTable) (map[string]interface{}, bool, error) {
 	return d.fetcher.Last(c)
 }
 
-func (d *db) Fetch(c *currentTable, recNo int64) (map[string]interface{}, bool, error) {
+// Fetch gets the row by it's record number (no index used)
+func (d *db) Fetch(c *CurrentTable, recNo int64) (map[string]interface{}, bool, bool, error) {
 	return d.fetcher.Fetch(c, recNo)
 }
 
-func (d *db) Next(c *currentTable) (map[string]interface{}, bool, error) {
+// Next moves the table, or index cursor the the next element (if index is in use)
+func (d *db) Next(c *CurrentTable) (map[string]interface{}, bool, error) {
 	return d.fetcher.Next(c)
 }
 
-func (d *db) Prev(c *currentTable) (map[string]interface{}, bool, error) {
+// Prev moves the table, or index cursor the the previous element (if index is in use)
+func (d *db) Prev(c *CurrentTable) (map[string]interface{}, bool, error) {
 	return d.fetcher.Prev(c)
 }
 
-func (d *db) Locate(c *currentTable, fieldName string, value interface{}) (map[string]interface{}, error) {
+// Locate tries to find the row by the provided value, if index is in use, it uses the index to get the value, then returns the element
+func (d *db) Locate(c *CurrentTable, fieldName string, value interface{}) (map[string]interface{}, error) {
 	return d.fetcher.Locate(c, fieldName, value)
 }
 
-func (d *db) Delete(c *currentTable, recNo int64) error {
+// Seek tries to set the index cursor to the closest element in the tree
+func (d *db) Seek(c *CurrentTable, value interface{}) error {
+	return d.fetcher.Seek(c, value)
+}
+
+// Delete deletes / mark as deleted the record (index not used, record id needs to be provided)
+func (d *db) Delete(c *CurrentTable, recNo int64) error {
 	return d.deleter.Delete(c, recNo)
 }
 
-func (d *db) Use(c *currentTable, indexName string) error {
+// Use will set an index to be used for locate, seek, next, prior, first, last
+func (d *db) Use(c *CurrentTable, indexName string) error {
+	// Empty string resets using no index
+	if indexName == "" {
+		c.userIndex = nil
+		return nil
+	}
+
 	for _, field := range c.fieldDef.Fields {
 		if field.Indexes != nil {
 			for _, index := range field.Indexes {
 				if index.Name == indexName {
-					c.usedIndex = index.index
+					c.userIndex = index.index
 					return nil
 				}
 			}

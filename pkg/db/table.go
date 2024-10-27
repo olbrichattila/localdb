@@ -11,14 +11,16 @@ import (
 
 // todo add index defs maybe for FileDef but probably not due to possible combined indexes
 // todo add transactions
-type currentTable struct {
+
+// CurrentTable holds the table info
+type CurrentTable struct {
 	tableName    string
 	fieldDef     FieldDef
 	recordNo     int64
 	fileHandlers fileHandlers
 	filer        filemanager.Filer
 	recordSize   int
-	usedIndex    *btree.BTree
+	userIndex    *btree.BTree
 }
 
 type fileHandlers struct {
@@ -55,11 +57,13 @@ type IndexDef struct {
 	index *btree.BTree // in future it may go to different indexes or interface and resolve by Type later
 }
 
-func (c *currentTable) CursorPos() int64 {
+// CursorPos returns the current cursor position
+func (c *CurrentTable) CursorPos() int64 {
 	return c.recordNo
 }
 
-func (c *currentTable) CursorCount() int64 {
+// CursorCount Return the number of cursors (rows)
+func (c *CurrentTable) CursorCount() int64 {
 	if c.fileHandlers.rpt == nil {
 		return 0
 	}
@@ -73,7 +77,8 @@ func (c *currentTable) CursorCount() int64 {
 	return stat.Size() / (filemanager.Int64Length + 1)
 }
 
-func (c *currentTable) Close() error {
+// Close closes the file handles in the table
+func (c *CurrentTable) Close() error {
 	errors := make([]string, 0)
 	err := c.fileHandlers.dat.Close()
 	if err != nil {
@@ -105,8 +110,8 @@ func (c *currentTable) Close() error {
 	return fmt.Errorf("errors closing files : %s", strings.Join(errors, ", "))
 }
 
-func newTableOpener(tableName string) (*currentTable, error) {
-	o := &currentTable{
+func newTableOpener(tableName string) (*CurrentTable, error) {
+	o := &CurrentTable{
 		tableName: tableName,
 		filer:     filemanager.New(),
 	}
@@ -117,7 +122,7 @@ func newTableOpener(tableName string) (*currentTable, error) {
 	return table, nil
 }
 
-func (c *currentTable) init() (*currentTable, error) {
+func (c *CurrentTable) init() (*CurrentTable, error) {
 	var fDef FieldDef
 	fileName := c.tableName + defFileExt
 	fullPath := c.filer.GetFullFilePath(fileName)
@@ -160,7 +165,7 @@ func (c *currentTable) init() (*currentTable, error) {
 	return c, nil
 }
 
-func (c *currentTable) openIndexes() error {
+func (c *CurrentTable) openIndexes() error {
 	for x, field := range c.fieldDef.Fields {
 		intIndex := false
 		if field.Type == FtInt {
@@ -180,7 +185,7 @@ func (c *currentTable) openIndexes() error {
 	return nil
 }
 
-func (c *currentTable) openPointerFile() error {
+func (c *CurrentTable) openPointerFile() error {
 	filePath := c.filer.GetFullFilePath(c.tableName + recordPointerFileExt)
 	file, err := c.openRw(filePath)
 	if err != nil {
@@ -191,7 +196,7 @@ func (c *currentTable) openPointerFile() error {
 	return nil
 }
 
-func (c *currentTable) openDatFile() error {
+func (c *CurrentTable) openDatFile() error {
 	filePath := c.filer.GetFullFilePath(c.tableName + dataFileExt)
 	file, err := c.openRw(filePath)
 	if err != nil {
@@ -202,7 +207,7 @@ func (c *currentTable) openDatFile() error {
 	return nil
 }
 
-func (*currentTable) openRw(filePath string) (*os.File, error) {
+func (*CurrentTable) openRw(filePath string) (*os.File, error) {
 	file, err := os.OpenFile(filePath, os.O_RDWR, 0644)
 	if err != nil {
 		return nil, fmt.Errorf("error opening file: %s", err)
@@ -211,7 +216,7 @@ func (*currentTable) openRw(filePath string) (*os.File, error) {
 	return file, nil
 }
 
-func (c *currentTable) calculateRecordSize() (int, error) {
+func (c *CurrentTable) calculateRecordSize() (int, error) {
 	size := 0
 
 	for _, field := range c.fieldDef.Fields {

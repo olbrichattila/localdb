@@ -4,9 +4,7 @@ package main
 import (
 	"fmt"
 	localdb "godb/pkg/db"
-	"os"
-	"strconv"
-	"time"
+	"godb/pkg/server"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -18,20 +16,34 @@ const (
 )
 
 func main() {
-	file, err := os.Create("output.txt")
+	// var err error
+	// err = os.RemoveAll("dbfolder")
+	// if err != nil {
+	// 	panic("Cannot remove dbfolder " + err.Error())
+	// }
+
+	// dataTest()
+	db := localdb.New()
+	currTable, err := db.Open(tableName)
 	if err != nil {
-		fmt.Println("Error creating file:", err)
-		return
+		panic("Cannot open table " + err.Error())
 	}
-	defer file.Close()
+	server.Serve(db, currTable)
+
+	// file, err := os.Create("output.txt")
+	// if err != nil {
+	// 	fmt.Println("Error creating file:", err)
+	// 	return
+	// }
+	// defer file.Close()
 
 	// Redirect standard output to the file
-	os.Stdout = file
+	// os.Stdout = file
 
-	dataTest()
-	useAndListUp()
-	fmt.Println("======================")
-	useAndListDown()
+	// dataTest()
+	// useAndListUp()
+	// fmt.Println("======================")
+	// useAndListDown()
 
 }
 
@@ -60,7 +72,7 @@ func useAndListUp() {
 	// val, eof, err := db.Next(currTable)
 	// fmt.Println(val, eof, err)
 
-	err = db.First(currTable)
+	_, _, err = db.First(currTable)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
@@ -109,7 +121,7 @@ func useAndListDown() {
 	// val, eof, err := db.Prev(currTable)
 	// fmt.Println(val, eof, err)
 
-	err = db.Last(currTable)
+	_, _, err = db.Last(currTable)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
@@ -152,24 +164,36 @@ func dataTest() {
 		panic("Cannot run test, Could not create database " + err.Error())
 	}
 
-	currTable, err := db.Open(tableName)
-	if err != nil {
-		panic("Cannot open table " + err.Error())
-	}
-	defer currTable.Close()
+	// currTable, err := db.Open(tableName)
+	// if err != nil {
+	// 	panic("Cannot open table " + err.Error())
+	// }
+	// defer currTable.Close()
 
-	data := map[string]interface{}{
-		// "field_1": "Test data",
-		"field_1": "00000",
-		"field_2": true,
-		"field_3": int64(150),
-		"field_4": "test",
-	}
+	// data := map[string]interface{}{
+	// 	// "field_1": "Test data",
+	// 	"field_1": "00000",
+	// 	"field_2": true,
+	// 	"field_3": int64(150),
+	// 	"field_4": "test",
+	// }
 
-	t0 := time.Now()
+	// t0 := time.Now()
 
-	// for i := 0; i < 1000; i++ {
-	// 	data["field_1"] = "Test data " + strconv.Itoa(i)
+	// // for i := 0; i < 1000; i++ {
+	// // 	data["field_1"] = "Test data " + strconv.Itoa(i)
+	// // 	data["field_3"] = int64(i)
+	// // 	data["field_4"] = strconv.Itoa(i)
+	// // 	_, err = db.Insert(currTable, data)
+	// // 	if err != nil {
+	// // 		panic("Insert error " + err.Error())
+	// // 	}
+	// // }
+
+	// // for i := 3000; i >= 0; i-- {
+	// for i := 100000; i >= 0; i-- {
+	// 	// data["field_1"] = "Test data " + fmt.Sprintf("%05d", i)
+	// 	data["field_1"] = fmt.Sprintf("%07d", i)
 	// 	data["field_3"] = int64(i)
 	// 	data["field_4"] = strconv.Itoa(i)
 	// 	_, err = db.Insert(currTable, data)
@@ -178,20 +202,8 @@ func dataTest() {
 	// 	}
 	// }
 
-	// for i := 3000; i >= 0; i-- {
-	for i := 100000; i >= 0; i-- {
-		// data["field_1"] = "Test data " + fmt.Sprintf("%05d", i)
-		data["field_1"] = fmt.Sprintf("%07d", i)
-		data["field_3"] = int64(i)
-		data["field_4"] = strconv.Itoa(i)
-		_, err = db.Insert(currTable, data)
-		if err != nil {
-			panic("Insert error " + err.Error())
-		}
-	}
-
-	elapsed := time.Since(t0)
-	fmt.Println("Elapsed time:", elapsed)
+	// elapsed := time.Since(t0)
+	// fmt.Println("Elapsed time:", elapsed)
 }
 
 // This function is just to benchmark against SQLIte

@@ -9,9 +9,9 @@ import (
 )
 
 const (
-	indexFileExt = ".inx"
-	// nodeSize     = 48
-	nodeSize = 6
+	indexFileExt = ".idx"
+	nodeSize     = 48
+	// nodeSize = 6
 )
 
 // New creates a new balanced tree object
@@ -174,7 +174,7 @@ func (t *Tree) Last() (int64, *[]byte, error) {
 	t.currentNode = node
 	t.currentNodeIdx = node.itemCount() - 1
 
-	if node.data[t.currentNodeIdx].isSet {
+	if t.currentNodeIdx >= 0 && node.data[t.currentNodeIdx].isSet {
 		result, _, err := node.getNextMapItem(t.currentNodeIdx)
 		return result, &node.data[t.currentNodeIdx].data, err
 	}
@@ -189,6 +189,11 @@ func (t *Tree) recursiveLast(ptr int64) (*Node, error) {
 		return nil, err
 	}
 
+	// TODO: this may have to go to the caller, and pre fetching the root node, this may improve performace. Profile it!
+	if sNode.isRoot() && sNode.itemCount() == 0 {
+		return sNode, nil
+	}
+
 	lastItemIndex := sNode.itemCount() - 1
 	if sNode.data[lastItemIndex].children != 0 {
 		return t.recursiveLast(sNode.data[lastItemIndex].children)
@@ -199,6 +204,9 @@ func (t *Tree) recursiveLast(ptr int64) (*Node, error) {
 
 // Next moves the index cursor to the next element, end returns the current value
 func (t *Tree) Next() (int64, *[]byte, bool, error) {
+	if t.currentNodeIdx == -1 {
+		return 0, nil, true, nil // Why even getting into this condition?
+	}
 	t.previousKey = &t.currentNode.data[t.currentNodeIdx].data
 	if t.currentNodeIdx >= 0 && t.currentNode.data[t.currentNodeIdx].isSet {
 		item, eof, err := t.currentNode.getNextMapItem(t.currentNodeIdx)
@@ -228,6 +236,11 @@ func (t *Tree) recursiveNext() (bool, error) {
 		t.currentNodeIdx++
 		if t.currentNode.data[t.currentNodeIdx].isSet {
 			return false, nil
+		}
+
+		if t.currentNode.isRoot() {
+			// this is a root and leaf node at the same time, we reached at the end
+			return true, nil
 		}
 
 		// at the end of the leaf node, to up
@@ -272,7 +285,6 @@ func (t *Tree) recursiveNext() (bool, error) {
 		t.currentNode.load(t.currentNode.data[t.currentNodeIdx].children)
 		t.currentNodeIdx = -1
 		return t.recursiveNext()
-		// return false, nil
 	}
 
 	return true, nil
@@ -280,6 +292,9 @@ func (t *Tree) recursiveNext() (bool, error) {
 
 // Prev moves the index cursor to the previous element, returns current value
 func (t *Tree) Prev() (int64, *[]byte, bool, error) {
+	if t.currentNodeIdx == -1 {
+		return 0, nil, true, nil
+	}
 	t.previousKey = &t.currentNode.data[t.currentNodeIdx].data
 	if t.currentNodeIdx >= 0 && t.currentNode.data[t.currentNodeIdx].isSet {
 		item, eof, err := t.currentNode.getNextMapItem(t.currentNodeIdx)

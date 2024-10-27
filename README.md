@@ -18,3 +18,4 @@ Indexes:
 - BTree (balanced tree) | Search and order
 - HashMap | Only for search | not yet implemented
 
+

@@ -94,12 +94,7 @@ func (t *btreeTestSuite) TestSearchNextWith1NodeMultipleValues() {
 	t.Equal(int64(68), res)
 	_, _, eof, err = t.tree.Next()
 	t.Nil(err)
-	t.False(eof)
-
-	_, _, eof, err = t.tree.Next()
-	t.Nil(err)
-	t.False(eof) // TODO check why fails?, should be t.True?
-
+	t.True(eof)
 }
 
 func (t *btreeTestSuite) TestAllINdexedItemCanBeFound() {

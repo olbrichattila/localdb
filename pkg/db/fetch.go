@@ -19,25 +19,26 @@ func newFetcher() fetcher {
 }
 
 type fetcher interface {
-	First(c *currentTable) error
-	Last(c *currentTable) error
-	Fetch(c *currentTable, recNo int64) (map[string]interface{}, bool, error)
-	Next(c *currentTable) (map[string]interface{}, bool, error)
-	Prev(c *currentTable) (map[string]interface{}, bool, error)
-	Locate(c *currentTable, fieldName string, value interface{}) (map[string]interface{}, error)
+	First(c *CurrentTable) (map[string]interface{}, bool, error)
+	Last(c *CurrentTable) (map[string]interface{}, bool, error)
+	Fetch(c *CurrentTable, recNo int64) (map[string]interface{}, bool, bool, error)
+	Next(c *CurrentTable) (map[string]interface{}, bool, error)
+	Prev(c *CurrentTable) (map[string]interface{}, bool, error)
+	Locate(c *CurrentTable, fieldName string, value interface{}) (map[string]interface{}, error)
+	Seek(c *CurrentTable, value interface{}) error
 }
 
 type fetch struct {
 	filer        filemanager.Filer
-	currentTable *currentTable
+	CurrentTable *CurrentTable
 }
 
-func (f *fetch) First(c *currentTable) error {
-	if c.usedIndex != nil {
-		index := *c.usedIndex
+func (f *fetch) First(c *CurrentTable) (map[string]interface{}, bool, error) {
+	if c.userIndex != nil {
+		index := *c.userIndex
 		ptr, _, err := index.First()
 		if err != nil {
-			return err
+			return nil, false, err
 		}
 
 		c.recordNo = ptr
@@ -45,16 +46,20 @@ func (f *fetch) First(c *currentTable) error {
 		c.recordNo = 0
 	}
 
-	return nil
+	result, eof, isDeleted, err := f.Fetch(c, c.recordNo)
+	if isDeleted {
+		return f.Next(c)
+	}
+	return result, eof, err
 }
 
-func (f *fetch) Last(c *currentTable) error {
-	if c.usedIndex != nil {
-		index := *c.usedIndex
+func (f *fetch) Last(c *CurrentTable) (map[string]interface{}, bool, error) {
+	if c.userIndex != nil {
+		index := *c.userIndex
 
 		ptr, _, err := index.Last()
 		if err != nil {
-			return err
+			return nil, false, err
 		}
 
 		c.recordNo = ptr
@@ -62,51 +67,56 @@ func (f *fetch) Last(c *currentTable) error {
 		c.recordNo = c.CursorCount()
 	}
 
-	return nil
+	result, eof, isDeleted, err := f.Fetch(c, c.recordNo)
+	if isDeleted {
+		return f.Prev(c)
+	}
+	return result, eof, err
 }
 
-func (f *fetch) Fetch(c *currentTable, recNo int64) (map[string]interface{}, bool, error) {
-	f.currentTable = c
+func (f *fetch) Fetch(c *CurrentTable, recNo int64) (map[string]interface{}, bool, bool, error) {
+	f.CurrentTable = c
 	datFilePointer, isDeleted, eof, err := f.filer.GetDatFilePointer(c.fileHandlers.rpt, recNo)
 	if err != nil {
-		return nil, false, err
+		return nil, false, false, err
 	}
 
 	if eof {
-		return nil, true, nil
+		return nil, true, false, nil
 	}
 
 	if isDeleted {
-		return nil, false, fmt.Errorf(errorMsgDeleted, recNo)
+		return nil, false, true, nil
 	}
 
 	record, eof, err := f.filer.ReadBytes(c.fileHandlers.dat, datFilePointer, c.recordSize)
 	if err != nil {
-		return nil, false, err
+		return nil, false, false, err
 	}
 
 	if eof {
-		return nil, true, nil
+		return nil, true, false, nil
 	}
 	c.recordNo = recNo
 	result, err := f.mapBufferToData(record)
+	result["_recNo"] = recNo
 
-	return result, false, err
+	return result, false, false, err
 }
 
-func (f *fetch) Next(c *currentTable) (map[string]interface{}, bool, error) {
+func (f *fetch) Next(c *CurrentTable) (map[string]interface{}, bool, error) {
 	return f.moveCursor(c, true)
 }
 
-func (f *fetch) Prev(c *currentTable) (map[string]interface{}, bool, error) {
+func (f *fetch) Prev(c *CurrentTable) (map[string]interface{}, bool, error) {
 	return f.moveCursor(c, false)
 }
 
-func (f *fetch) moveCursor(c *currentTable, moveDown bool) (map[string]interface{}, bool, error) {
-	f.currentTable = c
+func (f *fetch) moveCursor(c *CurrentTable, moveDown bool) (map[string]interface{}, bool, error) {
+	f.CurrentTable = c
 
-	if c.usedIndex != nil {
-		index := *c.usedIndex
+	if c.userIndex != nil {
+		index := *c.userIndex
 
 		var ptr int64
 		var eof bool
@@ -137,36 +147,21 @@ func (f *fetch) moveCursor(c *currentTable, moveDown bool) (map[string]interface
 		return nil, true, nil
 	}
 
-	datFilePointer, isDeleted, eof, err := f.filer.GetDatFilePointer(c.fileHandlers.rpt, c.recordNo)
+	result, eof, isDeleted, err := f.Fetch(c, c.recordNo)
 	if err != nil {
 		return nil, false, err
 	}
 
 	if isDeleted {
-		return nil, false, fmt.Errorf(errorMsgDeleted, c.recordNo)
+		return f.moveCursor(c, moveDown)
 	}
 
-	if eof {
-		return nil, true, nil
-	}
-
-	record, eof, err := f.filer.ReadBytes(c.fileHandlers.dat, datFilePointer, c.recordSize)
-	if err != nil {
-		return nil, false, err
-	}
-
-	if eof {
-		return nil, true, nil
-	}
-
-	result, err := f.mapBufferToData(record)
-	return result, false, err
+	return result, eof, nil
 }
 
-func (f *fetch) Locate(c *currentTable, fieldName string, value interface{}) (map[string]interface{}, error) {
-
-	if c.usedIndex != nil {
-		index := *c.usedIndex
+func (f *fetch) Locate(c *CurrentTable, fieldName string, value interface{}) (map[string]interface{}, error) {
+	if c.userIndex != nil {
+		index := *c.userIndex
 		// TODO it works only with sting for now, extract this logic and implement for each type
 		if v, ok := value.(string); ok {
 			ptr, _, found, err := index.Search([]byte(v))
@@ -177,19 +172,24 @@ func (f *fetch) Locate(c *currentTable, fieldName string, value interface{}) (ma
 				return nil, errNotFound
 			}
 
-			val, eof, err := f.Fetch(c, ptr)
+			val, eof, isDeleted, err := f.Fetch(c, ptr)
 			if err != nil {
 				return nil, err
 			}
+
 			if eof {
 				return nil, errNotFound
+			}
+
+			if isDeleted {
+				return val, fmt.Errorf("record is deleted")
 			}
 
 			return val, nil
 		}
 	}
 
-	result, eof, err := f.Fetch(c, int64(0))
+	result, eof, _, err := f.Fetch(c, int64(0))
 	if err != nil {
 		return nil, err
 	}
@@ -216,13 +216,29 @@ func (f *fetch) Locate(c *currentTable, fieldName string, value interface{}) (ma
 	return nil, errNotFound
 }
 
+// Seek tries to set the index cursor to the closest element in the tree
+func (f *fetch) Seek(c *CurrentTable, value interface{}) error {
+	if c.userIndex == nil {
+		return fmt.Errorf("seek only works if index is is use")
+	}
+
+	index := *c.userIndex
+	// TODO it works only with sting for now, extract this logic and implement for each type
+	if v, ok := value.(string); ok {
+		_, _, _, err := index.Search([]byte(v))
+		return err
+	}
+
+	return fmt.Errorf("Seek not yet implemented for the requested field type")
+}
+
 func (f *fetch) mapBufferToData(data []byte) (map[string]interface{}, error) {
 	mappedResult := make(map[string]interface{}, 0)
 	index := 0
 	str := ""
 	var integer int64
 
-	for _, field := range f.currentTable.fieldDef.Fields {
+	for _, field := range f.CurrentTable.fieldDef.Fields {
 		switch field.Type {
 		case FtText:
 			index, str = f.copyBuffToStr(data, index, field.Length)

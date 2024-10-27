@@ -12,7 +12,7 @@ import (
 type insertTestSuite struct {
 	suite.Suite
 	db Manager
-	ct *currentTable
+	ct *CurrentTable
 }
 
 func TestInsertRunner(t *testing.T) {
@@ -79,10 +79,10 @@ func (t *insertTestSuite) TestInsertOpenAndFetch() {
 	t.Nil(err)
 	t.Equal(int64(3), rc)
 
-	_, _, err = t.db.Fetch(t.ct, 0)
+	_, _, _, err = t.db.Fetch(t.ct, 0)
 	t.Nil(err)
 
-	result, _, err := t.db.Fetch(t.ct, int64(0))
+	result, _, _, err := t.db.Fetch(t.ct, int64(0))
 	t.Nil(err)
 
 	field1, ok := result["field_1"]
@@ -101,10 +101,10 @@ func (t *insertTestSuite) TestInsertOpenAndFetch() {
 	err = t.db.Delete(t.ct, 1)
 	t.Nil(err)
 
-	_, _, err = t.db.Fetch(t.ct, int64(1))
-	t.Error(err, "item 1 is deleted")
+	_, _, isDeleted, _ := t.db.Fetch(t.ct, int64(1))
+	t.True(isDeleted)
 
-	res, _, err := t.db.Fetch(t.ct, int64(0))
+	res, _, _, err := t.db.Fetch(t.ct, int64(0))
 	t.Nil(err)
 	fieldValue, ok := res["field_1"]
 	t.True(ok)
@@ -121,7 +121,7 @@ func (t *insertTestSuite) TestInsertOpenAndFetch() {
 		readCount++
 	}
 
-	t.Equal(2, readCount)
+	t.Equal(1, readCount)
 }
 
 func (t *insertTestSuite) TestInsert100Record() {
@@ -146,10 +146,10 @@ func (t *insertTestSuite) TestInsert100Record() {
 	t.Nil(err)
 	t.Equal(int64(1000), rc)
 
-	_, _, err = t.db.Fetch(t.ct, 0)
+	_, _, _, err = t.db.Fetch(t.ct, 0)
 	t.Nil(err)
 
-	result, _, err := t.db.Fetch(t.ct, int64(999))
+	result, _, _, err := t.db.Fetch(t.ct, int64(999))
 	t.Nil(err)
 
 	field1, ok := result["field_1"]

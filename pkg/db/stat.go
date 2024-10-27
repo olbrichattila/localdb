@@ -12,14 +12,14 @@ func newStat() stater {
 }
 
 type stater interface {
-	RecCount(*currentTable) (int64, error)
+	RecCount(*CurrentTable) (int64, error)
 }
 
 type stat struct {
 	filer filemanager.Filer
 }
 
-func (s *stat) RecCount(c *currentTable) (int64, error) {
+func (s *stat) RecCount(c *CurrentTable) (int64, error) {
 	filePath := s.filer.GetFullFilePath(c.tableName + recordPointerFileExt)
 
 	fileInfo, err := os.Stat(filePath)
