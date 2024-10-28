@@ -64,7 +64,7 @@ func (f *fetch) Last(c *CurrentTable) (map[string]interface{}, bool, error) {
 
 		c.recordNo = ptr
 	} else {
-		c.recordNo = c.CursorCount()
+		c.recordNo = c.CursorCount() - 1
 	}
 
 	result, eof, isDeleted, err := f.Fetch(c, c.recordNo)

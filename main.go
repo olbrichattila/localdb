@@ -5,6 +5,8 @@ import (
 	"fmt"
 	localdb "godb/pkg/db"
 	"godb/pkg/server"
+	"strconv"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -23,6 +25,7 @@ func main() {
 	// }
 
 	// dataTest()
+	dataTest()
 	db := localdb.New()
 	currTable, err := db.Open(tableName)
 	if err != nil {
@@ -164,36 +167,24 @@ func dataTest() {
 		panic("Cannot run test, Could not create database " + err.Error())
 	}
 
-	// currTable, err := db.Open(tableName)
-	// if err != nil {
-	// 	panic("Cannot open table " + err.Error())
-	// }
-	// defer currTable.Close()
+	currTable, err := db.Open(tableName)
+	if err != nil {
+		panic("Cannot open table " + err.Error())
+	}
+	defer currTable.Close()
 
-	// data := map[string]interface{}{
-	// 	// "field_1": "Test data",
-	// 	"field_1": "00000",
-	// 	"field_2": true,
-	// 	"field_3": int64(150),
-	// 	"field_4": "test",
-	// }
+	data := map[string]interface{}{
+		// "field_1": "Test data",
+		"field_1": "00000",
+		"field_2": true,
+		"field_3": int64(150),
+		"field_4": "test",
+	}
 
-	// t0 := time.Now()
+	t0 := time.Now()
 
-	// // for i := 0; i < 1000; i++ {
-	// // 	data["field_1"] = "Test data " + strconv.Itoa(i)
-	// // 	data["field_3"] = int64(i)
-	// // 	data["field_4"] = strconv.Itoa(i)
-	// // 	_, err = db.Insert(currTable, data)
-	// // 	if err != nil {
-	// // 		panic("Insert error " + err.Error())
-	// // 	}
-	// // }
-
-	// // for i := 3000; i >= 0; i-- {
-	// for i := 100000; i >= 0; i-- {
-	// 	// data["field_1"] = "Test data " + fmt.Sprintf("%05d", i)
-	// 	data["field_1"] = fmt.Sprintf("%07d", i)
+	// for i := 0; i < 1000; i++ {
+	// 	data["field_1"] = "Test data " + strconv.Itoa(i)
 	// 	data["field_3"] = int64(i)
 	// 	data["field_4"] = strconv.Itoa(i)
 	// 	_, err = db.Insert(currTable, data)
@@ -202,8 +193,20 @@ func dataTest() {
 	// 	}
 	// }
 
-	// elapsed := time.Since(t0)
-	// fmt.Println("Elapsed time:", elapsed)
+	// for i := 3000; i >= 0; i-- {
+	for i := 100000; i >= 0; i-- {
+		// data["field_1"] = "Test data " + fmt.Sprintf("%05d", i)
+		data["field_1"] = fmt.Sprintf("%07d", i)
+		data["field_3"] = int64(i)
+		data["field_4"] = strconv.Itoa(i)
+		_, err = db.Insert(currTable, data)
+		if err != nil {
+			panic("Insert error " + err.Error())
+		}
+	}
+
+	elapsed := time.Since(t0)
+	fmt.Println("Elapsed time:", elapsed)
 }
 
 // This function is just to benchmark against SQLIte
