@@ -25,7 +25,7 @@ type fetcher interface {
 	Next(c *CurrentTable) (map[string]interface{}, bool, error)
 	Prev(c *CurrentTable) (map[string]interface{}, bool, error)
 	Locate(c *CurrentTable, fieldName string, value interface{}) (map[string]interface{}, error)
-	Seek(c *CurrentTable, value interface{}) error
+	Seek(c *CurrentTable, value interface{}) (map[string]interface{}, error)
 }
 
 type fetch struct {
@@ -217,19 +217,25 @@ func (f *fetch) Locate(c *CurrentTable, fieldName string, value interface{}) (ma
 }
 
 // Seek tries to set the index cursor to the closest element in the tree
-func (f *fetch) Seek(c *CurrentTable, value interface{}) error {
+func (f *fetch) Seek(c *CurrentTable, value interface{}) (map[string]interface{}, error) {
 	if c.userIndex == nil {
-		return fmt.Errorf("seek only works if index is is use")
+		return nil, fmt.Errorf("seek only works if index is is use")
 	}
 
 	index := *c.userIndex
 	// TODO it works only with sting for now, extract this logic and implement for each type
 	if v, ok := value.(string); ok {
-		_, _, _, err := index.Search([]byte(v))
-		return err
+		recNo, _, _, err := index.Search([]byte(v))
+
+		result, _, _, err := f.Fetch(c, recNo)
+		if err != nil {
+			return nil, err
+		}
+
+		return result, err
 	}
 
-	return fmt.Errorf("Seek not yet implemented for the requested field type")
+	return nil, fmt.Errorf("Seek not yet implemented for the requested field type")
 }
 
 func (f *fetch) mapBufferToData(data []byte) (map[string]interface{}, error) {

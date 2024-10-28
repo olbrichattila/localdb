@@ -135,11 +135,15 @@ func (s *server) handlerInsert(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) handlerSeek(w http.ResponseWriter, r *http.Request) {
 	val := r.URL.Query().Get("value")
-	err := s.db.Seek(s.table, val)
+	dat, err := s.db.Seek(s.table, val)
+
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(&AppError{Error: err.Error(), Code: http.StatusInternalServerError})
+		return
 	}
+
+	json.NewEncoder(w).Encode(dat)
 }
 
 func (s *server) handlerDelete(w http.ResponseWriter, r *http.Request) {

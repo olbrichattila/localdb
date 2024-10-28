@@ -1,12 +1,12 @@
 package btree
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	filemanager "godb/pkg/file"
 	"io"
 	"os"
+	"strings"
 )
 
 const (
@@ -505,7 +505,9 @@ func (n *Node) readOffsetAsBool(from *[]byte, fromIndex int) (bool, int) {
 
 func (n *Node) bytesCompare(buf1, buf2 []byte) int {
 	if !n.isIntNode {
-		return bytes.Compare(buf1, buf2)
+		return n.stringCompare(&buf1, &buf2)
+		// lets try null terminated string compare
+		// return bytes.Compare(buf1, buf2)
 	}
 
 	if len(buf1) == 0 {
@@ -523,6 +525,33 @@ func (n *Node) bytesCompare(buf1, buf2 []byte) int {
 	}
 
 	return isGreater
+}
+func (n *Node) stringCompare(buf1, buf2 *[]byte) int {
+	s1 := n.bufToStr(buf1)
+	s2 := n.bufToStr(buf2)
+
+	if s1 == s2 {
+		return isEqual
+	}
+
+	if s1 < s2 {
+		return isLess
+	}
+
+	return isGreater
+}
+
+func (n *Node) bufToStr(buf *[]byte) string {
+	b := &strings.Builder{}
+	for _, v := range *buf {
+		if v == 0 {
+			break
+		}
+		b.WriteByte(v)
+	}
+
+	return b.String()
+
 }
 
 func (n *Node) setRoot() error {

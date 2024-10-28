@@ -25,7 +25,7 @@ func main() {
 	// }
 
 	// dataTest()
-	dataTest()
+	// dataTest()
 	db := localdb.New()
 	currTable, err := db.Open(tableName)
 	if err != nil {
@@ -194,7 +194,7 @@ func dataTest() {
 	// }
 
 	// for i := 3000; i >= 0; i-- {
-	for i := 100000; i >= 0; i-- {
+	for i := 10000000; i >= 0; i-- {
 		// data["field_1"] = "Test data " + fmt.Sprintf("%05d", i)
 		data["field_1"] = fmt.Sprintf("%07d", i)
 		data["field_3"] = int64(i)

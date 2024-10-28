@@ -27,7 +27,7 @@ type Manager interface {
 	Next(c *CurrentTable) (map[string]interface{}, bool, error)
 	Prev(c *CurrentTable) (map[string]interface{}, bool, error)
 	Locate(c *CurrentTable, fieldName string, value interface{}) (map[string]interface{}, error)
-	Seek(c *CurrentTable, value interface{}) error
+	Seek(c *CurrentTable, value interface{}) (map[string]interface{}, error)
 	Delete(c *CurrentTable, recNo int64) error
 	Use(c *CurrentTable, indexName string) error
 	// Add recNo
@@ -98,7 +98,7 @@ func (d *db) Locate(c *CurrentTable, fieldName string, value interface{}) (map[s
 }
 
 // Seek tries to set the index cursor to the closest element in the tree
-func (d *db) Seek(c *CurrentTable, value interface{}) error {
+func (d *db) Seek(c *CurrentTable, value interface{}) (map[string]interface{}, error) {
 	return d.fetcher.Seek(c, value)
 }
 

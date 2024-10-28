@@ -19,3 +19,4 @@ Indexes:
 - HashMap | Only for search | not yet implemented
 
 
+(some benchmark, Table with 3 indexes, 100 million rows. Seek time from BTree 2 millisecond, insert (updating 3 indexes) 3 millisecond, not bad for an experimental code)
