@@ -25,7 +25,7 @@ func main() {
 	// }
 
 	// dataTest()
-	// dataTest()
+	dataTest()
 	db := localdb.New()
 	currTable, err := db.Open(tableName)
 	if err != nil {

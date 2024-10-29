@@ -226,6 +226,9 @@ func (f *fetch) Seek(c *CurrentTable, value interface{}) (map[string]interface{}
 	// TODO it works only with sting for now, extract this logic and implement for each type
 	if v, ok := value.(string); ok {
 		recNo, _, _, err := index.Search([]byte(v))
+		if err != nil {
+			return nil, err
+		}
 
 		result, _, _, err := f.Fetch(c, recNo)
 		if err != nil {
