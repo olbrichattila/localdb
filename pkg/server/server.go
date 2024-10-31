@@ -15,6 +15,11 @@ type AppError struct {
 	Code  int    `json:"code"`
 }
 
+// Stat is a structure containing the JSON representation of database statistics, currently RecordCount only.
+type Stat struct {
+	RecordCount int64 `json:"recordCount"`
+}
+
 type server struct {
 	db    localdb.Manager
 	table *localdb.CurrentTable
@@ -23,7 +28,10 @@ type server struct {
 // Serve is a HTTP Server layer
 func Serve(db localdb.Manager, table *localdb.CurrentTable) {
 	server := &server{db: db, table: table}
+	http.HandleFunc("/struct", server.handlerStruct)
+	http.HandleFunc("/recCount", server.handlerRecCount)
 	http.HandleFunc("/use", server.handlerUse)
+	http.HandleFunc("/fetch", server.handlerFetch)
 	http.HandleFunc("/first", server.handlerFirst)
 	http.HandleFunc("/last", server.handlerLast)
 	http.HandleFunc("/next", server.handlerNext)
@@ -38,6 +46,24 @@ func Serve(db localdb.Manager, table *localdb.CurrentTable) {
 	}
 }
 
+func (s *server) handlerStruct(w http.ResponseWriter, _ *http.Request) {
+	structure := s.table.Struct()
+
+	json.NewEncoder(w).Encode(structure)
+}
+
+func (s *server) handlerRecCount(w http.ResponseWriter, _ *http.Request) {
+	rc, err := s.db.RecCount(s.table)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(&AppError{Error: err.Error(), Code: http.StatusInternalServerError})
+		return
+	}
+
+	stat := &Stat{RecordCount: rc}
+	json.NewEncoder(w).Encode(stat)
+}
+
 func (s *server) handlerUse(w http.ResponseWriter, r *http.Request) {
 	indexName := r.URL.Query().Get("indexName")
 	err := s.db.Use(s.table, indexName)
@@ -45,6 +71,31 @@ func (s *server) handlerUse(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(&AppError{Error: err.Error(), Code: http.StatusInternalServerError})
 	}
+}
+
+func (s *server) handlerFetch(w http.ResponseWriter, r *http.Request) {
+	val := r.URL.Query().Get("id")
+	num, err := strconv.ParseInt(val, 10, 64)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(&AppError{Error: "record ID is not a number", Code: http.StatusInternalServerError})
+		return
+	}
+
+	dat, eof, _, err := s.db.Fetch(s.table, num)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(&AppError{Error: err.Error(), Code: http.StatusInternalServerError})
+		return
+	}
+
+	if eof {
+		w.WriteHeader(http.StatusResetContent)
+		json.NewEncoder(w).Encode(&AppError{Error: "beginning of table", Code: http.StatusResetContent})
+		return
+	}
+
+	json.NewEncoder(w).Encode(dat)
 }
 
 func (s *server) handlerFirst(w http.ResponseWriter, _ *http.Request) {

@@ -165,6 +165,11 @@ func (c *CurrentTable) init() (*CurrentTable, error) {
 	return c, nil
 }
 
+// Struct returns with the structure of the table
+func (c *CurrentTable) Struct() *FieldDef {
+	return &c.fieldDef
+}
+
 func (c *CurrentTable) openIndexes() error {
 	for x, field := range c.fieldDef.Fields {
 		intIndex := false

@@ -18,6 +18,7 @@ func New() Manager {
 type Manager interface {
 	Create(tableName string, tableStruct *FieldDef) error
 	Open(tableName string) (*CurrentTable, error)
+	Struct(c *CurrentTable) *FieldDef
 	Close(c *CurrentTable) error
 	Insert(*CurrentTable, map[string]interface{}) (*CurrentTable, error)
 	RecCount(c *CurrentTable) (int64, error)
@@ -40,6 +41,11 @@ type db struct {
 	stater       stater
 	fetcher      fetcher
 	deleter      deleter
+}
+
+// Create creates a database with it's structure
+func (d *db) Struct(c *CurrentTable) *FieldDef {
+	return c.Struct()
 }
 
 // Create creates a database with it's structure

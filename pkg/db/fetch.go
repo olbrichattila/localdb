@@ -8,10 +8,6 @@ import (
 	"strings"
 )
 
-const (
-	errorMsgDeleted = "item %d is deleted"
-)
-
 var errNotFound = errors.New("not found")
 
 func newFetcher() fetcher {
