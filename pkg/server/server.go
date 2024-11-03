@@ -20,6 +20,11 @@ type Stat struct {
 	RecordCount int64 `json:"recordCount"`
 }
 
+type RecordStatus struct {
+	Eof bool `json:"eof"`
+	Bof bool `json:"bof"`
+}
+
 type server struct {
 	db    localdb.Manager
 	table *localdb.CurrentTable
@@ -32,6 +37,7 @@ func Serve(db localdb.Manager, table *localdb.CurrentTable) {
 	http.HandleFunc("/recCount", server.handlerRecCount)
 	http.HandleFunc("/use", server.handlerUse)
 	http.HandleFunc("/fetch", server.handlerFetch)
+	http.HandleFunc("/fetchCurrent", server.handlerFetchCurrent)
 	http.HandleFunc("/first", server.handlerFirst)
 	http.HandleFunc("/last", server.handlerLast)
 	http.HandleFunc("/next", server.handlerNext)
@@ -90,8 +96,23 @@ func (s *server) handlerFetch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if eof {
-		w.WriteHeader(http.StatusResetContent)
-		json.NewEncoder(w).Encode(&AppError{Error: "beginning of table", Code: http.StatusResetContent})
+		json.NewEncoder(w).Encode(&RecordStatus{Eof: true})
+		return
+	}
+
+	json.NewEncoder(w).Encode(dat)
+}
+
+func (s *server) handlerFetchCurrent(w http.ResponseWriter, _ *http.Request) {
+	dat, eof, _, err := s.db.FetchCurrent(s.table)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(&AppError{Error: err.Error(), Code: http.StatusInternalServerError})
+		return
+	}
+
+	if eof {
+		json.NewEncoder(w).Encode(&RecordStatus{Eof: true})
 		return
 	}
 
@@ -99,41 +120,25 @@ func (s *server) handlerFetch(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) handlerFirst(w http.ResponseWriter, _ *http.Request) {
-	dat, eof, err := s.db.First(s.table)
+	err := s.db.First(s.table)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(&AppError{Error: err.Error(), Code: http.StatusInternalServerError})
 		return
 	}
-
-	if eof {
-		w.WriteHeader(http.StatusResetContent)
-		json.NewEncoder(w).Encode(&AppError{Error: "beginning of table", Code: http.StatusResetContent})
-		return
-	}
-
-	json.NewEncoder(w).Encode(dat)
 }
 
 func (s *server) handlerLast(w http.ResponseWriter, _ *http.Request) {
-	dat, eof, err := s.db.Last(s.table)
+	err := s.db.Last(s.table)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(&AppError{Error: err.Error(), Code: http.StatusInternalServerError})
 		return
 	}
-
-	if eof {
-		w.WriteHeader(http.StatusResetContent)
-		json.NewEncoder(w).Encode(&AppError{Error: "beginning of table", Code: http.StatusResetContent})
-		return
-	}
-
-	json.NewEncoder(w).Encode(dat)
 }
 
 func (s *server) handlerNext(w http.ResponseWriter, _ *http.Request) {
-	dat, eof, err := s.db.Next(s.table)
+	eof, err := s.db.Next(s.table)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(&AppError{Error: err.Error(), Code: http.StatusInternalServerError})
@@ -141,16 +146,15 @@ func (s *server) handlerNext(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	if eof {
-		w.WriteHeader(http.StatusResetContent)
-		json.NewEncoder(w).Encode(&AppError{Error: "end of table", Code: http.StatusResetContent})
+		json.NewEncoder(w).Encode(&RecordStatus{Eof: true})
 		return
 	}
 
-	json.NewEncoder(w).Encode(dat)
+	json.NewEncoder(w).Encode(&RecordStatus{})
 }
 
 func (s *server) handlerPrev(w http.ResponseWriter, _ *http.Request) {
-	dat, bof, err := s.db.Prev(s.table)
+	bof, err := s.db.Prev(s.table)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(&AppError{Error: err.Error(), Code: http.StatusInternalServerError})
@@ -158,12 +162,11 @@ func (s *server) handlerPrev(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	if bof {
-		w.WriteHeader(http.StatusResetContent)
-		json.NewEncoder(w).Encode(&AppError{Error: "beginning of table", Code: http.StatusResetContent})
+		json.NewEncoder(w).Encode(&RecordStatus{Bof: true})
 		return
 	}
 
-	json.NewEncoder(w).Encode(dat)
+	json.NewEncoder(w).Encode(&RecordStatus{})
 }
 
 func (s *server) handlerInsert(w http.ResponseWriter, r *http.Request) {
@@ -186,15 +189,13 @@ func (s *server) handlerInsert(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) handlerSeek(w http.ResponseWriter, r *http.Request) {
 	val := r.URL.Query().Get("value")
-	dat, err := s.db.Seek(s.table, val)
+	err := s.db.Seek(s.table, val)
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(&AppError{Error: err.Error(), Code: http.StatusInternalServerError})
 		return
 	}
-
-	json.NewEncoder(w).Encode(dat)
 }
 
 func (s *server) handlerDelete(w http.ResponseWriter, r *http.Request) {

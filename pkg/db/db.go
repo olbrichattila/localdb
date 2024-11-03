@@ -8,7 +8,6 @@ func New() Manager {
 	return &db{
 		tableCreator: newTableCreator(),
 		inserter:     newInserter(),
-		stater:       newStat(),
 		fetcher:      newFetcher(),
 		deleter:      newDeleter(),
 	}
@@ -22,13 +21,14 @@ type Manager interface {
 	Close(c *CurrentTable) error
 	Insert(*CurrentTable, map[string]interface{}) (*CurrentTable, error)
 	RecCount(c *CurrentTable) (int64, error)
-	First(c *CurrentTable) (map[string]interface{}, bool, error)
-	Last(c *CurrentTable) (map[string]interface{}, bool, error)
+	First(c *CurrentTable) error
+	Last(c *CurrentTable) error
 	Fetch(c *CurrentTable, recNo int64) (map[string]interface{}, bool, bool, error)
-	Next(c *CurrentTable) (map[string]interface{}, bool, error)
-	Prev(c *CurrentTable) (map[string]interface{}, bool, error)
+	FetchCurrent(c *CurrentTable) (map[string]interface{}, bool, bool, error)
+	Next(c *CurrentTable) (bool, error)
+	Prev(c *CurrentTable) (bool, error)
 	Locate(c *CurrentTable, fieldName string, value interface{}) (map[string]interface{}, error)
-	Seek(c *CurrentTable, value interface{}) (map[string]interface{}, error)
+	Seek(c *CurrentTable, value interface{}) error
 	Delete(c *CurrentTable, recNo int64) error
 	Use(c *CurrentTable, indexName string) error
 	// Add recNo
@@ -38,7 +38,6 @@ type Manager interface {
 type db struct {
 	tableCreator tableCreator
 	inserter     inserter
-	stater       stater
 	fetcher      fetcher
 	deleter      deleter
 }
@@ -70,16 +69,16 @@ func (d *db) Insert(c *CurrentTable, data map[string]interface{}) (*CurrentTable
 
 // RecCount returns with the number of records in the table
 func (d *db) RecCount(c *CurrentTable) (int64, error) {
-	return d.stater.RecCount(c)
+	return c.recCount()
 }
 
 // First moves the table or index if in use to the first position, returns first value
-func (d *db) First(c *CurrentTable) (map[string]interface{}, bool, error) {
+func (d *db) First(c *CurrentTable) error {
 	return d.fetcher.First(c)
 }
 
 // Last moves the table or index if in use to the last position, returns last value
-func (d *db) Last(c *CurrentTable) (map[string]interface{}, bool, error) {
+func (d *db) Last(c *CurrentTable) error {
 	return d.fetcher.Last(c)
 }
 
@@ -88,13 +87,18 @@ func (d *db) Fetch(c *CurrentTable, recNo int64) (map[string]interface{}, bool, 
 	return d.fetcher.Fetch(c, recNo)
 }
 
+// FetchCurrent gets the row where the cursor was moved last time
+func (d *db) FetchCurrent(c *CurrentTable) (map[string]interface{}, bool, bool, error) {
+	return d.fetcher.FetchCurrent(c)
+}
+
 // Next moves the table, or index cursor the the next element (if index is in use)
-func (d *db) Next(c *CurrentTable) (map[string]interface{}, bool, error) {
+func (d *db) Next(c *CurrentTable) (bool, error) {
 	return d.fetcher.Next(c)
 }
 
 // Prev moves the table, or index cursor the the previous element (if index is in use)
-func (d *db) Prev(c *CurrentTable) (map[string]interface{}, bool, error) {
+func (d *db) Prev(c *CurrentTable) (bool, error) {
 	return d.fetcher.Prev(c)
 }
 
@@ -104,7 +108,7 @@ func (d *db) Locate(c *CurrentTable, fieldName string, value interface{}) (map[s
 }
 
 // Seek tries to set the index cursor to the closest element in the tree
-func (d *db) Seek(c *CurrentTable, value interface{}) (map[string]interface{}, error) {
+func (d *db) Seek(c *CurrentTable, value interface{}) error {
 	return d.fetcher.Seek(c, value)
 }
 

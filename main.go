@@ -40,12 +40,12 @@ func main() {
 	// }
 	// defer file.Close()
 
-	// Redirect standard output to the file
+	// // Redirect standard output to the file
 	// os.Stdout = file
 
-	// dataTest()
+	// // dataTest()
 	// useAndListUp()
-	// fmt.Println("======================")
+	// // fmt.Println("======================")
 	// useAndListDown()
 
 }
@@ -75,7 +75,7 @@ func useAndListUp() {
 	// val, eof, err := db.Next(currTable)
 	// fmt.Println(val, eof, err)
 
-	_, _, err = db.First(currTable)
+	err = db.First(currTable)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
@@ -83,8 +83,9 @@ func useAndListUp() {
 
 	x := 0
 	for {
+		dat, eof, _, err := db.FetchCurrent(currTable)
 		x++
-		dat, eof, err := db.Next(currTable)
+
 		if dat != nil {
 			fmt.Println(dat[displayField], x)
 		}
@@ -96,6 +97,15 @@ func useAndListUp() {
 			break
 		}
 
+		eof, err = db.Next(currTable)
+		if err != nil {
+			fmt.Println(err.Error())
+			break
+		}
+
+		if eof {
+			break
+		}
 	}
 }
 
@@ -124,7 +134,7 @@ func useAndListDown() {
 	// val, eof, err := db.Prev(currTable)
 	// fmt.Println(val, eof, err)
 
-	_, _, err = db.Last(currTable)
+	err = db.Last(currTable)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
@@ -134,7 +144,8 @@ func useAndListDown() {
 	x--
 	for {
 		x--
-		dat, eof, err := db.Prev(currTable)
+
+		dat, eof, _, err := db.FetchCurrent(currTable)
 
 		if err != nil {
 			fmt.Println(err.Error())
@@ -147,6 +158,15 @@ func useAndListDown() {
 			break
 		}
 
+		eof, err = db.Prev(currTable)
+		if err != nil {
+			fmt.Println(err.Error())
+			break
+		}
+
+		if eof {
+			break
+		}
 	}
 }
 

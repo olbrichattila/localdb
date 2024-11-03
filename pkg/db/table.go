@@ -17,6 +17,7 @@ type CurrentTable struct {
 	tableName    string
 	fieldDef     FieldDef
 	recordNo     int64
+	recordCount  int64
 	fileHandlers fileHandlers
 	filer        filemanager.Filer
 	recordSize   int
@@ -123,6 +124,11 @@ func newTableOpener(tableName string) (*CurrentTable, error) {
 }
 
 func (c *CurrentTable) init() (*CurrentTable, error) {
+	var err error
+	c.recordCount, err = c.recCount()
+	if err != nil {
+		return c, err
+	}
 	var fDef FieldDef
 	fileName := c.tableName + defFileExt
 	fullPath := c.filer.GetFullFilePath(fileName)
@@ -238,4 +244,15 @@ func (c *CurrentTable) calculateRecordSize() (int, error) {
 	}
 
 	return size, nil
+}
+
+func (c *CurrentTable) recCount() (int64, error) {
+	filePath := c.filer.GetFullFilePath(c.tableName + recordPointerFileExt)
+
+	fileInfo, err := os.Stat(filePath)
+	if err != nil {
+		return 0, err
+	}
+
+	return fileInfo.Size() / filemanager.PointerRecordLength, nil
 }

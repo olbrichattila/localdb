@@ -114,7 +114,7 @@ func (t *insertTestSuite) TestInsertOpenAndFetch() {
 	t.Equal(int64(150), field3)
 	readCount := 0
 	for {
-		_, eof, _ := t.db.Next(t.ct)
+		eof, _ := t.db.Next(t.ct)
 		if eof {
 			break
 		}

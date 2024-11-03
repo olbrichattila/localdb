@@ -15,13 +15,14 @@ func newFetcher() fetcher {
 }
 
 type fetcher interface {
-	First(c *CurrentTable) (map[string]interface{}, bool, error)
-	Last(c *CurrentTable) (map[string]interface{}, bool, error)
+	First(c *CurrentTable) error
+	Last(c *CurrentTable) error
 	Fetch(c *CurrentTable, recNo int64) (map[string]interface{}, bool, bool, error)
-	Next(c *CurrentTable) (map[string]interface{}, bool, error)
-	Prev(c *CurrentTable) (map[string]interface{}, bool, error)
+	FetchCurrent(c *CurrentTable) (map[string]interface{}, bool, bool, error)
+	Next(c *CurrentTable) (bool, error)
+	Prev(c *CurrentTable) (bool, error)
 	Locate(c *CurrentTable, fieldName string, value interface{}) (map[string]interface{}, error)
-	Seek(c *CurrentTable, value interface{}) (map[string]interface{}, error)
+	Seek(c *CurrentTable, value interface{}) error
 }
 
 type fetch struct {
@@ -29,12 +30,12 @@ type fetch struct {
 	CurrentTable *CurrentTable
 }
 
-func (f *fetch) First(c *CurrentTable) (map[string]interface{}, bool, error) {
+func (f *fetch) First(c *CurrentTable) error {
 	if c.userIndex != nil {
 		index := *c.userIndex
 		ptr, _, err := index.First()
 		if err != nil {
-			return nil, false, err
+			return err
 		}
 
 		c.recordNo = ptr
@@ -42,20 +43,27 @@ func (f *fetch) First(c *CurrentTable) (map[string]interface{}, bool, error) {
 		c.recordNo = 0
 	}
 
-	result, eof, isDeleted, err := f.Fetch(c, c.recordNo)
-	if isDeleted {
-		return f.Next(c)
+	_, _, isDeleted, err := f.Fetch(c, c.recordNo)
+	if err != nil {
+		return err
 	}
-	return result, eof, err
+	if isDeleted {
+		_, err := f.Next(c)
+		if err != nil {
+			return err
+		}
+
+	}
+	return nil
 }
 
-func (f *fetch) Last(c *CurrentTable) (map[string]interface{}, bool, error) {
+func (f *fetch) Last(c *CurrentTable) error {
 	if c.userIndex != nil {
 		index := *c.userIndex
 
 		ptr, _, err := index.Last()
 		if err != nil {
-			return nil, false, err
+			return err
 		}
 
 		c.recordNo = ptr
@@ -63,11 +71,24 @@ func (f *fetch) Last(c *CurrentTable) (map[string]interface{}, bool, error) {
 		c.recordNo = c.CursorCount() - 1
 	}
 
-	result, eof, isDeleted, err := f.Fetch(c, c.recordNo)
-	if isDeleted {
-		return f.Prev(c)
+	_, _, isDeleted, err := f.Fetch(c, c.recordNo)
+	if err != nil {
+		return err
 	}
-	return result, eof, err
+
+	if isDeleted {
+		_, err := f.Prev(c)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	return nil
+}
+
+func (f *fetch) FetchCurrent(c *CurrentTable) (map[string]interface{}, bool, bool, error) {
+	return f.Fetch(c, c.recordNo)
 }
 
 func (f *fetch) Fetch(c *CurrentTable, recNo int64) (map[string]interface{}, bool, bool, error) {
@@ -76,6 +97,8 @@ func (f *fetch) Fetch(c *CurrentTable, recNo int64) (map[string]interface{}, boo
 	if err != nil {
 		return nil, false, false, err
 	}
+
+	c.recordNo = recNo
 
 	if eof {
 		return nil, true, false, nil
@@ -93,6 +116,7 @@ func (f *fetch) Fetch(c *CurrentTable, recNo int64) (map[string]interface{}, boo
 	if eof {
 		return nil, true, false, nil
 	}
+
 	c.recordNo = recNo
 	result, err := f.mapBufferToData(record)
 	result["_recNo"] = recNo
@@ -100,15 +124,15 @@ func (f *fetch) Fetch(c *CurrentTable, recNo int64) (map[string]interface{}, boo
 	return result, false, false, err
 }
 
-func (f *fetch) Next(c *CurrentTable) (map[string]interface{}, bool, error) {
+func (f *fetch) Next(c *CurrentTable) (bool, error) {
 	return f.moveCursor(c, true)
 }
 
-func (f *fetch) Prev(c *CurrentTable) (map[string]interface{}, bool, error) {
+func (f *fetch) Prev(c *CurrentTable) (bool, error) {
 	return f.moveCursor(c, false)
 }
 
-func (f *fetch) moveCursor(c *CurrentTable, moveDown bool) (map[string]interface{}, bool, error) {
+func (f *fetch) moveCursor(c *CurrentTable, moveDown bool) (bool, error) {
 	f.CurrentTable = c
 
 	if c.userIndex != nil {
@@ -123,11 +147,11 @@ func (f *fetch) moveCursor(c *CurrentTable, moveDown bool) (map[string]interface
 			ptr, _, eof, err = index.Prev()
 		}
 		if err != nil {
-			return nil, false, err
+			return false, err
 		}
 
 		if eof {
-			return nil, true, nil
+			return true, nil
 		}
 
 		c.recordNo = ptr
@@ -139,20 +163,17 @@ func (f *fetch) moveCursor(c *CurrentTable, moveDown bool) (map[string]interface
 		}
 	}
 
-	if c.recordNo == -1 {
-		return nil, true, nil
+	if !moveDown && c.recordNo == -1 {
+		c.recordNo = 0
+		return true, nil
 	}
 
-	result, eof, isDeleted, err := f.Fetch(c, c.recordNo)
-	if err != nil {
-		return nil, false, err
+	if moveDown && c.recordNo >= c.recordCount {
+		c.recordNo = c.recordCount - 1
+		return true, nil
 	}
 
-	if isDeleted {
-		return f.moveCursor(c, moveDown)
-	}
-
-	return result, eof, nil
+	return false, nil
 }
 
 func (f *fetch) Locate(c *CurrentTable, fieldName string, value interface{}) (map[string]interface{}, error) {
@@ -200,7 +221,7 @@ func (f *fetch) Locate(c *CurrentTable, fieldName string, value interface{}) (ma
 				return result, nil
 			}
 		}
-		result, eof, err = f.Next(c)
+		eof, err = f.Next(c)
 		if err != nil {
 			return nil, err
 		}
@@ -213,9 +234,9 @@ func (f *fetch) Locate(c *CurrentTable, fieldName string, value interface{}) (ma
 }
 
 // Seek tries to set the index cursor to the closest element in the tree
-func (f *fetch) Seek(c *CurrentTable, value interface{}) (map[string]interface{}, error) {
+func (f *fetch) Seek(c *CurrentTable, value interface{}) error {
 	if c.userIndex == nil {
-		return nil, fmt.Errorf("seek only works if index is is use")
+		return fmt.Errorf("seek only works if index is is use")
 	}
 
 	index := *c.userIndex
@@ -223,18 +244,14 @@ func (f *fetch) Seek(c *CurrentTable, value interface{}) (map[string]interface{}
 	if v, ok := value.(string); ok {
 		recNo, _, _, err := index.Search([]byte(v))
 		if err != nil {
-			return nil, err
+			return err
 		}
+		c.recordNo = recNo
 
-		result, _, _, err := f.Fetch(c, recNo)
-		if err != nil {
-			return nil, err
-		}
-
-		return result, err
+		return nil
 	}
 
-	return nil, fmt.Errorf("Seek not yet implemented for the requested field type")
+	return fmt.Errorf("Seek not yet implemented for the requested field type")
 }
 
 func (f *fetch) mapBufferToData(data []byte) (map[string]interface{}, error) {

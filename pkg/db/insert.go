@@ -41,6 +41,7 @@ func (i *ins) Insert(c *CurrentTable, data map[string]interface{}) (*CurrentTabl
 	}
 
 	i.addToIndexIfIndexed(data, recordNo)
+	i.CurrentTable.recordCount++
 	return i.CurrentTable, nil
 }
 
