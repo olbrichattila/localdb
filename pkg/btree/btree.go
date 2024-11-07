@@ -47,16 +47,17 @@ type BTree interface {
 
 // Tree represents the B-tree as a whole.
 type Tree struct {
-	searchKey      *[]byte
-	previousKey    *[]byte
-	filer          filemanager.Filer
-	indexName      string
-	file           *os.File
-	bufSize        int
-	currentNode    *Node
-	currentNodeIdx int
-	parentNodePtr  int64
-	intIndex       bool
+	searchKey       *[]byte
+	previousKey     *[]byte
+	filer           filemanager.Filer
+	indexName       string
+	file            *os.File
+	bufSize         int
+	currentNode     *Node
+	currentNodeIdx  int
+	parentNodePtr   int64
+	intIndex        bool
+	latestNextIsEof bool
 }
 
 // Insert inserts a key-value pair into the B-tree.
@@ -207,6 +208,7 @@ func (t *Tree) Next() (int64, *[]byte, bool, error) {
 	if t.currentNodeIdx == -1 {
 		return 0, nil, true, nil // Why even getting into this condition?
 	}
+
 	t.previousKey = &t.currentNode.data[t.currentNodeIdx].data
 	if t.currentNodeIdx >= 0 && t.currentNode.data[t.currentNodeIdx].isSet {
 		item, eof, err := t.currentNode.getNextMapItem(t.currentNodeIdx)
@@ -225,6 +227,8 @@ func (t *Tree) Next() (int64, *[]byte, bool, error) {
 	}
 
 	if eof {
+		// Need to move back the cursor to last, as it will go to forever loop with prior ending up in index -1
+		t.Last()
 		return 0, nil, true, nil
 	}
 
@@ -295,6 +299,7 @@ func (t *Tree) Prev() (int64, *[]byte, bool, error) {
 	if t.currentNodeIdx == -1 {
 		return 0, nil, true, nil
 	}
+
 	t.previousKey = &t.currentNode.data[t.currentNodeIdx].data
 	if t.currentNodeIdx >= 0 && t.currentNode.data[t.currentNodeIdx].isSet {
 		item, eof, err := t.currentNode.getNextMapItem(t.currentNodeIdx)
