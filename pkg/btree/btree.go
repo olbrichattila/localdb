@@ -319,6 +319,7 @@ func (t *Tree) Prev() (int64, *[]byte, bool, error) {
 	}
 
 	if eof {
+		t.First()
 		return 0, nil, true, nil
 	}
 
